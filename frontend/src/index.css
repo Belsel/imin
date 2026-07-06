@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Core palette */
+  --color-background:    #F0FDFA;
+  --color-surface:       #FFFFFF;
+  --color-primary:       #0B6E65;
+  --color-on-primary:    #FFFFFF;
+  --color-accent:        #D97706;
+  --color-text:          #0F172A;
+
+  /* Extended colour tokens */
+  --color-text-muted:    #475569;
+  --color-border:        #CBD5E1;
+
+  /* Semantic aliases */
+  --color-error:         #DC2626;
+  --color-warning:       #FFFBEB;
+  --color-warning-text:  #92400E;
+  --color-success:       #15803D;
+
+  /* Font families */
+  --font-display: 'Syne', sans-serif;
+  --font-body:    'DM Sans', sans-serif;
+}
+
+/* Global base styles */
+body {
+  font-family: var(--font-body);
+  color: var(--color-text);
+  background-color: var(--color-background);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+}
+
+/* Consistent focus ring — in @layer base so component focus:outline-none can override */
+@layer base {
+  *:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+/* Prefers-reduced-motion: suppress all transitions and animations */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

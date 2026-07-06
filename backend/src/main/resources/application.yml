@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: backend
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/imin}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            scope: openid,profile,email
+
+jwt:
+  secret: ${JWT_SECRET:dev-only-change-me-dev-only-change-me}
+
+resend:
+  api-key: ${RESEND_API_KEY:}
+
+email:
+  from-address: ${EMAIL_FROM_ADDRESS:no-reply@example.com}
+
+ors:
+  api-key: ${ORS_API_KEY:}
+
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+
+server:
+  port: ${PORT:8080}
