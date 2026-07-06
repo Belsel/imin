@@ -1,6 +1,7 @@
 services:
   - type: web
     name: imin-backend
+    region: frankfurt
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
