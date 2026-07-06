@@ -157,10 +157,12 @@ export default function ActivityDetailPage() {
   }
 
   // Reverse-geocode for the view-mode location section (R7).
-  // Uses optional chaining so it is safe to call before `activity` is loaded.
+  // Checks `activity` is loaded first — `activity?.latitude !== null` is not
+  // enough on its own, since `undefined !== null` is also true, which let
+  // this run (and crash on the `activity!` assertion) before `activity` loaded.
   const viewCoords =
-    activity?.latitude !== null && activity?.longitude !== null
-      ? { lat: activity!.latitude as number, lng: activity!.longitude as number }
+    activity && activity.latitude !== null && activity.longitude !== null
+      ? { lat: activity.latitude, lng: activity.longitude }
       : null
   const {
     placeName: viewPlaceName,
