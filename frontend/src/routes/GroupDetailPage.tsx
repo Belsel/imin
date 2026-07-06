@@ -14,6 +14,7 @@ import {
   blockUser,
   createActivity,
   deleteGroup,
+  deleteGroupMessage,
   getGroup,
   getGroupMessages,
   joinGroup,
@@ -119,10 +120,13 @@ export default function GroupDetailPage() {
   // leaving the group) or the page unmounts.
   const chatConversationKey = group?.isMember ? id : null
   const fetchGroupMessages = useCallback((after?: number) => getGroupMessages(id, after), [id])
-  const { messages, isLoading: isChatLoading, loadError: chatLoadError, appendSentMessage } = useChatPolling(
-    chatConversationKey,
-    fetchGroupMessages,
-  )
+  const {
+    messages,
+    isLoading: isChatLoading,
+    loadError: chatLoadError,
+    appendSentMessage,
+    removeMessage,
+  } = useChatPolling(chatConversationKey, fetchGroupMessages)
 
   async function handleSendMessage(body: string) {
     setChatSendError(null)
@@ -131,6 +135,16 @@ export default function GroupDetailPage() {
       appendSentMessage(sent)
     } catch (err) {
       setChatSendError(err instanceof ApiError ? err.message : 'Could not send message.')
+    }
+  }
+
+  async function handleDeleteMessage(messageId: number) {
+    setChatSendError(null)
+    try {
+      await deleteGroupMessage(id, messageId)
+      removeMessage(messageId)
+    } catch (err) {
+      setChatSendError(err instanceof ApiError ? err.message : 'Could not delete message.')
     }
   }
 
@@ -590,6 +604,8 @@ export default function GroupDetailPage() {
               currentUserId={user?.id}
               onSend={handleSendMessage}
               sendError={chatSendError}
+              isGroupAdmin={group.isAdmin}
+              onDelete={handleDeleteMessage}
             />
           </div>
         )}

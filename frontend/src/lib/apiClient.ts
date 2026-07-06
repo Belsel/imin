@@ -434,6 +434,13 @@ export function postGroupMessage(
   })
 }
 
+/** Message's own sender or any current group admin only; enforced server-side (403 otherwise). */
+export function deleteGroupMessage(groupId: number, messageId: number): Promise<void> {
+  return apiFetch<void>(`/api/groups/${groupId}/messages/${messageId}`, {
+    method: 'DELETE',
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Direct chat (DM) endpoints
 // ---------------------------------------------------------------------------

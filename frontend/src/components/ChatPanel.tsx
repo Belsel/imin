@@ -24,6 +24,8 @@ export default function ChatPanel({
   currentUserId,
   onSend,
   sendError,
+  isGroupAdmin = false,
+  onDelete,
 }: {
   messages: ChatPanelMessage[]
   isLoading: boolean
@@ -31,9 +33,24 @@ export default function ChatPanel({
   currentUserId: number | undefined
   onSend: (body: string) => Promise<void>
   sendError: string | null
+  /** Group chat only — omit for direct messages, where there's no admin concept. */
+  isGroupAdmin?: boolean
+  /** When provided, shows a delete affordance for messages the viewer may remove. */
+  onDelete?: (messageId: number) => Promise<void>
 }) {
   const [draft, setDraft] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+
+  async function handleDelete(messageId: number) {
+    if (!onDelete || deletingId !== null) return
+    setDeletingId(messageId)
+    try {
+      await onDelete(messageId)
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -59,6 +76,7 @@ export default function ChatPanel({
         )}
         {messages.map((message) => {
           const isOwn = message.senderId === currentUserId
+          const canDelete = Boolean(onDelete) && (isOwn || isGroupAdmin)
           return (
             <div key={message.id} className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
               <div
@@ -73,8 +91,18 @@ export default function ChatPanel({
                 )}
                 <p className="whitespace-pre-wrap break-words">{message.body}</p>
               </div>
-              <span className="mt-0.5 text-xs text-text-muted">
+              <span className="mt-0.5 flex items-center gap-2 text-xs text-text-muted">
                 {new Date(message.createdAt).toLocaleString()}
+                {canDelete && (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(message.id)}
+                    disabled={deletingId === message.id}
+                    className="font-medium text-error transition-colors hover:underline disabled:opacity-50"
+                  >
+                    {deletingId === message.id ? 'Deleting…' : 'Delete'}
+                  </button>
+                )}
               </span>
             </div>
           )

@@ -2,6 +2,7 @@ package com.imin.backend.chat;
 
 import com.imin.backend.chat.dto.GroupChatMessageResponse;
 import com.imin.backend.chat.dto.PostGroupChatMessageRequest;
+import com.imin.backend.group.GroupMembership;
 import com.imin.backend.group.GroupMembershipRepository;
 import com.imin.backend.group.GroupRepository;
 import com.imin.backend.user.User;
@@ -102,6 +103,44 @@ public class GroupChatService {
         return messages.stream()
                 .map(m -> GroupChatMessageResponse.from(m, usersById.get(m.getSenderId())))
                 .toList();
+    }
+
+    /**
+     * The message's own sender can delete it; any current admin of the
+     * group can also delete it, including messages they didn't send
+     * (spec: group-chat-moderation). A non-sender, non-admin member is
+     * rejected with 403 — mirrors {@code ActivityService.requireOwnerOrAdmin}
+     * exactly.
+     */
+    @Transactional
+    public void deleteMessage(String callerEmail, Long groupId, Long messageId) {
+        User caller = findUserByEmail(callerEmail);
+        requireGroupExists(groupId);
+        GroupChatMessage message = findMessageOr404(groupId, messageId);
+        requireSenderOrAdmin(groupId, caller.getId(), message);
+
+        messageRepository.delete(message);
+    }
+
+    private void requireSenderOrAdmin(Long groupId, Long callerUserId, GroupChatMessage message) {
+        if (message.getSenderId().equals(callerUserId)) {
+            return;
+        }
+
+        GroupMembership membership = membershipRepository.findByGroupIdAndUserId(groupId, callerUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this group"));
+        if (!membership.isAdmin()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the message's sender or a group admin can do this");
+        }
+    }
+
+    private GroupChatMessage findMessageOr404(Long groupId, Long messageId) {
+        GroupChatMessage message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found"));
+        if (!message.getGroupId().equals(groupId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found");
+        }
+        return message;
     }
 
     private void requireGroupExists(Long groupId) {

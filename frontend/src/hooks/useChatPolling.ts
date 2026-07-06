@@ -126,5 +126,15 @@ export function useChatPolling<T extends PollableMessage>(
     lastIdRef.current = message.id
   }, [])
 
-  return { messages, isLoading, loadError, appendSentMessage }
+  // Deletion is a hard delete on the backend (spec: group-chat-moderation) —
+  // there is no tombstone for a poll to re-discover, so the caller must
+  // optimistically drop it from local state itself once the delete request
+  // succeeds. `lastIdRef` is untouched: the cursor tracks "highest id ever
+  // seen" so a later poll doesn't re-request (and can't re-receive, since
+  // it's actually gone) this id.
+  const removeMessage = useCallback((messageId: number) => {
+    setMessages((current) => current.filter((m) => m.id !== messageId))
+  }, [])
+
+  return { messages, isLoading, loadError, appendSentMessage, removeMessage }
 }

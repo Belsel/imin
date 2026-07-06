@@ -218,4 +218,61 @@ class GroupChatServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(404));
     }
+
+    @Test
+    void senderCanDeleteTheirOwnMessage() {
+        GroupResponse group = createGroup(alice, "Senders Group");
+        groupService.joinGroup(bob.getEmail(), group.id());
+        GroupChatMessageResponse message = groupChatService.postMessage(bob.getEmail(), group.id(),
+                new PostGroupChatMessageRequest("delete me"));
+
+        groupChatService.deleteMessage(bob.getEmail(), group.id(), message.id());
+
+        assertThat(groupChatService.getMessages(alice.getEmail(), group.id(), null)).isEmpty();
+    }
+
+    @Test
+    void adminCanDeleteAnotherMembersMessage() {
+        // alice is admin by virtue of being the creator (spec.md Groups).
+        GroupResponse group = createGroup(alice, "Moderated Group");
+        groupService.joinGroup(bob.getEmail(), group.id());
+        GroupChatMessageResponse message = groupChatService.postMessage(bob.getEmail(), group.id(),
+                new PostGroupChatMessageRequest("spam"));
+
+        groupChatService.deleteMessage(alice.getEmail(), group.id(), message.id());
+
+        assertThat(groupChatService.getMessages(alice.getEmail(), group.id(), null)).isEmpty();
+    }
+
+    @Test
+    void nonSenderNonAdminMemberCannotDeleteAnotherMembersMessage() {
+        GroupResponse group = createGroup(alice, "Three's Company");
+        groupService.joinGroup(bob.getEmail(), group.id());
+        User carol = createUser("carol@example.com", "Carol");
+        groupService.joinGroup(carol.getEmail(), group.id());
+        GroupChatMessageResponse message = groupChatService.postMessage(bob.getEmail(), group.id(),
+                new PostGroupChatMessageRequest("bob's message"));
+
+        assertThatThrownBy(() -> groupChatService.deleteMessage(carol.getEmail(), group.id(), message.id()))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(403));
+
+        assertThat(groupChatService.getMessages(alice.getEmail(), group.id(), null)).hasSize(1);
+    }
+
+    @Test
+    void deletingMessageFromWrongGroupOrNonexistentReturns404() {
+        GroupResponse groupA = createGroup(alice, "Group A");
+        GroupResponse groupB = createGroup(alice, "Group B");
+        GroupChatMessageResponse message = groupChatService.postMessage(alice.getEmail(), groupA.id(),
+                new PostGroupChatMessageRequest("in A"));
+
+        assertThatThrownBy(() -> groupChatService.deleteMessage(alice.getEmail(), groupB.id(), message.id()))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(404));
+
+        assertThatThrownBy(() -> groupChatService.deleteMessage(alice.getEmail(), groupA.id(), 999_999L))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(404));
+    }
 }
