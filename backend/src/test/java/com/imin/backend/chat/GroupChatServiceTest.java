@@ -275,4 +275,43 @@ class GroupChatServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(404));
     }
+
+    // ---- try-demo-account restriction enforcement (specs/try-demo-account/spec.md) ----
+
+    @Test
+    void demoAccountCannotDeleteAnyMessageIncludingItsOwn() {
+        User demo = createUser("demo@example.com", "Demo User");
+        demo.setDemoAccount(true);
+        userRepository.save(demo);
+
+        GroupResponse group = createGroup(alice, "Demo Chat Group");
+        groupService.joinGroup(demo.getEmail(), group.id());
+        GroupChatMessageResponse ownMessage = groupChatService.postMessage(demo.getEmail(), group.id(),
+                new PostGroupChatMessageRequest("demo's own message"));
+
+        assertThatThrownBy(() -> groupChatService.deleteMessage(demo.getEmail(), group.id(), ownMessage.id()))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(403));
+
+        // The message survives -- the block is unconditional, even for the demo account's own message.
+        assertThat(groupChatService.getMessages(alice.getEmail(), group.id(), null)).hasSize(1);
+    }
+
+    @Test
+    void demoAccountCanStillPostAndReadMessagesNormally() {
+        // Spot-check of the explicitly-allowed surface (postMessage, getMessages).
+        User demo = createUser("demo@example.com", "Demo User");
+        demo.setDemoAccount(true);
+        userRepository.save(demo);
+
+        GroupResponse group = createGroup(alice, "Demo Allowed Group");
+        groupService.joinGroup(demo.getEmail(), group.id());
+
+        GroupChatMessageResponse posted = groupChatService.postMessage(demo.getEmail(), group.id(),
+                new PostGroupChatMessageRequest("hello from demo"));
+
+        assertThat(posted.body()).isEqualTo("hello from demo");
+        assertThat(groupChatService.getMessages(demo.getEmail(), group.id(), null))
+                .extracting(GroupChatMessageResponse::body).contains("hello from demo");
+    }
 }

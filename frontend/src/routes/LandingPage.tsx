@@ -1,5 +1,8 @@
-import { Link } from 'react-router'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router'
 import PublicGroupsSection from '../components/PublicGroupsSection'
+import { useAuth } from '../context/AuthContext'
+import { ApiError } from '../lib/apiClient'
 
 /**
  * Public, unauthenticated landing page rendered at "/" for logged-out
@@ -15,6 +18,24 @@ import PublicGroupsSection from '../components/PublicGroupsSection'
  * then send them to /register or /login.
  */
 export default function LandingPage() {
+  const { loginAsDemo } = useAuth()
+  const navigate = useNavigate()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleDemoLogin() {
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      await loginAsDemo()
+      navigate('/', { replace: true })
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not start the demo session. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-primary px-6 py-16 sm:py-24">
@@ -42,7 +63,16 @@ export default function LandingPage() {
             >
               Log in
             </Link>
+            <button
+              type="button"
+              onClick={handleDemoLogin}
+              disabled={isSubmitting}
+              className="rounded-full border border-on-primary/60 px-6 py-2.5 font-medium font-body text-on-primary transition-colors motion-safe:hover:bg-on-primary/10 focus:outline-none focus:ring-2 focus:ring-on-primary focus:ring-offset-2 focus:ring-offset-primary disabled:opacity-50"
+            >
+              {isSubmitting ? 'Starting demo…' : 'Try demo account'}
+            </button>
           </div>
+          {error && <p className="text-sm text-error">{error}</p>}
         </div>
       </header>
 

@@ -160,6 +160,7 @@ public class GroupService {
     @Transactional
     public GroupResponse updateGroup(String callerEmail, Long groupId, UpdateGroupRequest request) {
         User caller = findUserByEmail(callerEmail);
+        assertNotDemoAccount(caller);
         requireAdmin(groupId, caller.getId());
 
         Group group = findGroupOr404(groupId);
@@ -173,6 +174,7 @@ public class GroupService {
     @Transactional
     public void deleteGroup(String callerEmail, Long groupId) {
         User caller = findUserByEmail(callerEmail);
+        assertNotDemoAccount(caller);
         requireAdmin(groupId, caller.getId());
         findGroupOr404(groupId);
 
@@ -202,6 +204,7 @@ public class GroupService {
     @Transactional
     public void leaveGroup(String callerEmail, Long groupId) {
         User caller = findUserByEmail(callerEmail);
+        assertNotDemoAccount(caller);
         findGroupOr404(groupId);
 
         GroupMembership membership = membershipRepository.findByGroupIdAndUserId(groupId, caller.getId())
@@ -214,6 +217,7 @@ public class GroupService {
     @Transactional
     public void kickMember(String callerEmail, Long groupId, Long targetUserId) {
         User caller = findUserByEmail(callerEmail);
+        assertNotDemoAccount(caller);
         requireAdmin(groupId, caller.getId());
         findGroupOr404(groupId);
 
@@ -227,6 +231,7 @@ public class GroupService {
     @Transactional
     public void banMember(String callerEmail, Long groupId, Long targetUserId) {
         User caller = findUserByEmail(callerEmail);
+        assertNotDemoAccount(caller);
         requireAdmin(groupId, caller.getId());
         findGroupOr404(groupId);
 
@@ -247,6 +252,7 @@ public class GroupService {
     @Transactional
     public void unbanMember(String callerEmail, Long groupId, Long targetUserId) {
         User caller = findUserByEmail(callerEmail);
+        assertNotDemoAccount(caller);
         requireAdmin(groupId, caller.getId());
         findGroupOr404(groupId);
 
@@ -258,6 +264,7 @@ public class GroupService {
     @Transactional
     public GroupResponse addCategory(String callerEmail, Long groupId, Long categoryId) {
         User caller = findUserByEmail(callerEmail);
+        assertNotDemoAccount(caller);
         requireAdmin(groupId, caller.getId());
         Group group = findGroupOr404(groupId);
 
@@ -277,6 +284,7 @@ public class GroupService {
     @Transactional
     public GroupResponse removeCategory(String callerEmail, Long groupId, Long categoryId) {
         User caller = findUserByEmail(callerEmail);
+        assertNotDemoAccount(caller);
         requireAdmin(groupId, caller.getId());
         Group group = findGroupOr404(groupId);
 
@@ -519,6 +527,13 @@ public class GroupService {
     private User findUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    }
+
+    private void assertNotDemoAccount(User user) {
+        if (user.isDemoAccount()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "This action is disabled for the shared demo account");
+        }
     }
 
     private Map<Long, User> usersById(List<Long> ids) {

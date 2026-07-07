@@ -153,6 +153,11 @@ export function login(request: LoginRequest): Promise<AuthResponse> {
   })
 }
 
+/** Passwordless auto-login for the shared "Try demo account" entry point (see LoginPage/LandingPage). */
+export function demoLogin(): Promise<AuthResponse> {
+  return apiFetch<AuthResponse>('/api/auth/demo-login', { method: 'POST', skipAuth: true })
+}
+
 export function verifyEmail(token: string): Promise<void> {
   return apiFetch<void>(`/api/auth/verify-email?token=${encodeURIComponent(token)}`, {
     method: 'GET',

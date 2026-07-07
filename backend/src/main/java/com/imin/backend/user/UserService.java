@@ -20,6 +20,7 @@ public class UserService {
 
     public ProfileResponse updateProfile(String email, UpdateProfileRequest request) {
         User user = findByEmail(email);
+        assertNotDemoAccount(user);
 
         if (request.displayName() != null) {
             if (request.displayName().isBlank()) {
@@ -39,5 +40,12 @@ public class UserService {
     private User findByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    }
+
+    private void assertNotDemoAccount(User user) {
+        if (user.isDemoAccount()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "This action is disabled for the shared demo account");
+        }
     }
 }

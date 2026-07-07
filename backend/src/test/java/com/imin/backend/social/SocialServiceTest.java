@@ -148,4 +148,41 @@ class SocialServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(400));
     }
+
+    // ---- try-demo-account restriction enforcement (specs/try-demo-account/spec.md) ----
+
+    @Test
+    void demoAccountCanStillAddFriendBlockAndUnblockNormally() {
+        // Spot-check of SocialService's explicitly-allowed surface for the
+        // demo account -- unchanged from a normal user, no 403 anywhere here.
+        User demo = createUser("demo@example.com", "Demo User");
+        demo.setDemoAccount(true);
+        userRepository.save(demo);
+
+        socialService.addFriend(demo.getEmail(), bob.getId());
+        assertThat(socialService.listFriends(demo.getEmail())).extracting(FriendResponse::userId).containsExactly(bob.getId());
+
+        socialService.blockUser(demo.getEmail(), alice.getId());
+        assertThat(socialService.listBlocks(demo.getEmail())).extracting(BlockResponse::userId).containsExactly(alice.getId());
+
+        socialService.unblockUser(demo.getEmail(), alice.getId());
+        assertThat(socialService.listBlocks(demo.getEmail())).isEmpty();
+
+        socialService.removeFriend(demo.getEmail(), bob.getId());
+        assertThat(socialService.listFriends(demo.getEmail())).isEmpty();
+    }
+
+    @Test
+    void anotherUserCanStillBlockTheDemoAccountAsATarget() {
+        // Security edge case: blocking works normally when the demo account
+        // is the *target* -- the demo-actor-only block never widens/narrows
+        // what another user can do to the demo account.
+        User demo = createUser("demo@example.com", "Demo User");
+        demo.setDemoAccount(true);
+        userRepository.save(demo);
+
+        socialService.blockUser(alice.getEmail(), demo.getId());
+
+        assertThat(socialService.listBlocks(alice.getEmail())).extracting(BlockResponse::userId).containsExactly(demo.getId());
+    }
 }

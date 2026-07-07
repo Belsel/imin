@@ -89,6 +89,7 @@ public class ActivityService {
     @Transactional
     public ActivityResponse updateActivity(String callerEmail, Long groupId, Long activityId, UpdateActivityRequest request) {
         User caller = findUserByEmail(callerEmail);
+        assertNotDemoAccount(caller);
         requireGroupExists(groupId);
         Activity activity = findActivityOr404(groupId, activityId);
         requireOwnerOrAdmin(groupId, caller.getId(), activity);
@@ -106,6 +107,7 @@ public class ActivityService {
     @Transactional
     public void deleteActivity(String callerEmail, Long groupId, Long activityId) {
         User caller = findUserByEmail(callerEmail);
+        assertNotDemoAccount(caller);
         requireGroupExists(groupId);
         Activity activity = findActivityOr404(groupId, activityId);
         requireOwnerOrAdmin(groupId, caller.getId(), activity);
@@ -158,5 +160,12 @@ public class ActivityService {
     private User findUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    }
+
+    private void assertNotDemoAccount(User user) {
+        if (user.isDemoAccount()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "This action is disabled for the shared demo account");
+        }
     }
 }

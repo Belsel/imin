@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { ApiError, googleOAuthUrl } from '../lib/apiClient'
 
 export default function LoginPage() {
-  const { login } = useAuth()
+  const { login, loginAsDemo } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -30,6 +30,20 @@ export default function LoginPage() {
       } else {
         setError(err instanceof ApiError ? err.message : 'Login failed. Please try again.')
       }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function handleDemoLogin() {
+    setError(null)
+    setUnverified(false)
+    setIsSubmitting(true)
+    try {
+      await loginAsDemo()
+      navigate('/', { replace: true })
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not start the demo session. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -92,6 +106,15 @@ export default function LoginPage() {
         >
           Sign in with Google
         </a>
+
+        <button
+          type="button"
+          onClick={handleDemoLogin}
+          disabled={isSubmitting}
+          className="mt-3 block w-full rounded-full border border-border px-4 py-2 text-center font-medium font-body text-text-muted transition-colors motion-safe:hover:bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50"
+        >
+          {isSubmitting ? 'Starting demo…' : 'Try demo account'}
+        </button>
 
         <p className="mt-4 text-sm text-text-muted font-body">
           Don't have an account?{' '}

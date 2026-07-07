@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react'
 import {
   ApiError,
+  demoLogin as apiDemoLogin,
   getMyProfile,
   getStoredToken,
   login as apiLogin,
@@ -17,6 +18,8 @@ interface AuthContextValue {
   isLoading: boolean
   /** Email + password login. Stores the JWT and loads the profile on success. */
   login: (email: string, password: string) => Promise<void>
+  /** Passwordless auto-login for the shared "Try demo account" entry point. Stores the JWT and loads the profile on success. */
+  loginAsDemo: () => Promise<void>
   /** Registration. Does NOT log the user in — LOCAL accounts require email verification first. */
   register: (request: RegisterRequest) => Promise<RegisterResponse>
   /** Store a JWT obtained out-of-band (e.g. the Google OAuth2 redirect) and load the profile. */
@@ -68,6 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [loadProfile],
   )
 
+  const loginAsDemo = useCallback(async () => {
+    const response = await apiDemoLogin()
+    setStoredToken(response.token)
+    await loadProfile()
+  }, [loadProfile])
+
   const loginWithToken = useCallback(
     async (token: string) => {
       setStoredToken(token)
@@ -84,8 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, isLoading, login, register, loginWithToken, setUser, logout }),
-    [user, isLoading, login, register, loginWithToken, logout],
+    () => ({ user, isLoading, login, loginAsDemo, register, loginWithToken, setUser, logout }),
+    [user, isLoading, login, loginAsDemo, register, loginWithToken, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -33,5 +33,11 @@ ors:
 app:
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
 
+demo:
+  account:
+    email: ${DEMO_ACCOUNT_EMAIL:demo@imin.app}
+    password: ${DEMO_ACCOUNT_PASSWORD:ImInDemo2026!}
+    display-name: ${DEMO_ACCOUNT_DISPLAY_NAME:Demo User}
+
 server:
   port: ${PORT:8080}

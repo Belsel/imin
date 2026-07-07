@@ -68,6 +68,23 @@ public class AuthService {
         return issueToken(user);
     }
 
+    /**
+     * Passwordless auto-login for the shared "Try demo account" entry point
+     * (see specs/try-demo-account/spec.md). Looks up the demo user by the
+     * demo flag rather than the configured email — the authoritative "is this
+     * the demo account" signal is the flag on the row, not whatever
+     * {@code demo.account.email} currently resolves to, so this stays in sync
+     * with the restriction-enforcement checks that key off the same flag.
+     * Reuses {@link #issueToken(User)} verbatim so the issued JWT has exactly
+     * the same claim shape as a normal login.
+     */
+    public AuthResponse demoLogin() {
+        User user = userRepository.findFirstByDemoAccountTrue()
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.INTERNAL_SERVER_ERROR, "Demo account is not provisioned"));
+        return issueToken(user);
+    }
+
     public void verifyEmail(String token) {
         EmailVerificationToken verificationToken = verificationTokenRepository.findByToken(token)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid verification token"));

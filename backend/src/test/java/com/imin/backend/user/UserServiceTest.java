@@ -164,4 +164,27 @@ class UserServiceTest {
         User reloaded = userRepository.findByEmail("profile-user@example.com").orElseThrow();
         assertThat(reloaded.getDisplayName()).isEqualTo("Profile User");
     }
+
+    // ---- try-demo-account restriction enforcement (specs/try-demo-account/spec.md) ----
+
+    @Test
+    void demoAccountCannotUpdateItsProfile() {
+        User demo = new User();
+        demo.setEmail("demo-profile@example.com");
+        demo.setPasswordHash("hash");
+        demo.setDisplayName("Demo User");
+        demo.setProvider(AuthProvider.LOCAL);
+        demo.setEmailVerified(true);
+        demo.setDemoAccount(true);
+        userRepository.save(demo);
+
+        assertThatThrownBy(() -> userService.updateProfile("demo-profile@example.com",
+                new UpdateProfileRequest("New Name", "new bio")))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(403));
+
+        User reloaded = userRepository.findByEmail("demo-profile@example.com").orElseThrow();
+        assertThat(reloaded.getDisplayName()).isEqualTo("Demo User");
+        assertThat(reloaded.getBio()).isNull();
+    }
 }

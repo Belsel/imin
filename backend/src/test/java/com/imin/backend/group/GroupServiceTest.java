@@ -90,6 +90,13 @@ class GroupServiceTest {
         return userRepository.save(user);
     }
 
+    /** Same as {@link #createUser}, but flagged as the shared demo account. */
+    private User createDemoUser(String email, String displayName) {
+        User user = createUser(email, displayName);
+        user.setDemoAccount(true);
+        return userRepository.save(user);
+    }
+
     @Test
     void creatingGroupMakesCreatorAdminAndMember() {
         GroupResponse response = groupService.createGroup(alice.getEmail(),
@@ -614,6 +621,162 @@ class GroupServiceTest {
         assertThat(recs).hasSize(1);
         assertThat(recs.get(0).id()).isEqualTo(group.getId());
         assertThat(recs.get(0).memberCount()).isEqualTo(0);
+    }
+
+    // ---- try-demo-account restriction enforcement (specs/try-demo-account/spec.md) ----
+
+    @Test
+    void demoAccountCannotDeleteGroupEvenAsSoleAdmin() {
+        User demo = createDemoUser("demo@example.com", "Demo User");
+        GroupResponse group = createGroup(demo, "Demo's Group");
+
+        assertThatThrownBy(() -> groupService.deleteGroup(demo.getEmail(), group.id()))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(403));
+
+        // The group survives -- the block is unconditional, even for the demo account's own group.
+        assertThat(groupRepository.findById(group.id())).isPresent();
+    }
+
+    @Test
+    void demoAccountCannotUpdateGroup() {
+        User demo = createDemoUser("demo@example.com", "Demo User");
+        GroupResponse group = createGroup(demo, "Original Name");
+
+        assertThatThrownBy(() -> groupService.updateGroup(demo.getEmail(), group.id(),
+                new UpdateGroupRequest("Renamed", "new desc")))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(403));
+
+        assertThat(groupRepository.findById(group.id()).orElseThrow().getName()).isEqualTo("Original Name");
+    }
+
+    @Test
+    void demoAccountCannotLeaveGroup() {
+        User demo = createDemoUser("demo@example.com", "Demo User");
+        GroupResponse group = createGroup(demo, "Demo's Only Group");
+        groupService.joinGroup(bob.getEmail(), group.id());
+
+        assertThatThrownBy(() -> groupService.leaveGroup(demo.getEmail(), group.id()))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(403));
+
+        assertThat(membershipRepository.existsByGroupIdAndUserId(group.id(), demo.getId())).isTrue();
+    }
+
+    @Test
+    void demoAccountCannotKickMember() {
+        User demo = createDemoUser("demo@example.com", "Demo User");
+        GroupResponse group = createGroup(demo, "Demo Admin Group");
+        groupService.joinGroup(bob.getEmail(), group.id());
+
+        assertThatThrownBy(() -> groupService.kickMember(demo.getEmail(), group.id(), bob.getId()))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(403));
+
+        assertThat(membershipRepository.existsByGroupIdAndUserId(group.id(), bob.getId())).isTrue();
+    }
+
+    @Test
+    void demoAccountCannotBanMember() {
+        User demo = createDemoUser("demo@example.com", "Demo User");
+        GroupResponse group = createGroup(demo, "Demo Ban Group");
+        groupService.joinGroup(bob.getEmail(), group.id());
+
+        assertThatThrownBy(() -> groupService.banMember(demo.getEmail(), group.id(), bob.getId()))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(403));
+
+        assertThat(banRepository.existsByGroupIdAndUserId(group.id(), bob.getId())).isFalse();
+        assertThat(membershipRepository.existsByGroupIdAndUserId(group.id(), bob.getId())).isTrue();
+    }
+
+    @Test
+    void demoAccountCannotUnbanMember() {
+        // alice bans bob first (a real ban row to attempt to undo)...
+        GroupResponse group = createGroup(alice, "Unban Group");
+        groupService.joinGroup(bob.getEmail(), group.id());
+        groupService.banMember(alice.getEmail(), group.id(), bob.getId());
+
+        // ...then the demo account, promoted to co-admin of the same group,
+        // still cannot unban -- blocked unconditionally, not because it lacks
+        // admin rights.
+        User demo = createDemoUser("demo@example.com", "Demo User");
+        groupService.joinGroup(demo.getEmail(), group.id());
+        GroupMembership demoMembership = membershipRepository.findByGroupIdAndUserId(group.id(), demo.getId())
+                .orElseThrow();
+        demoMembership.setAdmin(true);
+        membershipRepository.save(demoMembership);
+
+        assertThatThrownBy(() -> groupService.unbanMember(demo.getEmail(), group.id(), bob.getId()))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(403));
+
+        assertThat(banRepository.existsByGroupIdAndUserId(group.id(), bob.getId())).isTrue();
+    }
+
+    @Test
+    void demoAccountCannotAddCategory() {
+        User demo = createDemoUser("demo@example.com", "Demo User");
+        GroupResponse group = createGroup(demo, "Demo Category Group");
+        Long categoryId = groupCategoryRepository.findAll().get(0).getId();
+
+        assertThatThrownBy(() -> groupService.addCategory(demo.getEmail(), group.id(), categoryId))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(403));
+
+        assertThat(categoryLinkRepository.findByGroupId(group.id())).isEmpty();
+    }
+
+    @Test
+    void demoAccountCannotRemoveCategory() {
+        User demo = createDemoUser("demo@example.com", "Demo User");
+        GroupResponse group = createGroup(demo, "Demo Category Group 2");
+        Long categoryId = groupCategoryRepository.findAll().get(0).getId();
+        // Add the category link directly (bypassing the blocked addCategory) so
+        // there is something real for removeCategory to (fail to) remove.
+        GroupCategoryLink link = new GroupCategoryLink();
+        link.setGroupId(group.id());
+        link.setCategoryId(categoryId);
+        categoryLinkRepository.save(link);
+
+        assertThatThrownBy(() -> groupService.removeCategory(demo.getEmail(), group.id(), categoryId))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(403));
+
+        assertThat(categoryLinkRepository.findByGroupIdAndCategoryId(group.id(), categoryId)).isPresent();
+    }
+
+    @Test
+    void demoAccountCanStillCreateAndJoinGroupsNormally() {
+        // Spot-check of the explicitly-allowed surface (createGroup, joinGroup)
+        // for the demo account -- unchanged from a normal user, no 403.
+        User demo = createDemoUser("demo@example.com", "Demo User");
+
+        GroupResponse created = createGroup(demo, "Demo Created Group");
+        assertThat(created.isAdmin()).isTrue();
+        assertThat(created.isMember()).isTrue();
+
+        GroupResponse other = createGroup(alice, "Alice's Open Group");
+        groupService.joinGroup(demo.getEmail(), other.id());
+        assertThat(membershipRepository.existsByGroupIdAndUserId(other.id(), demo.getId())).isTrue();
+    }
+
+    @Test
+    void anotherAdminCanStillKickOrBanTheDemoAccountAsATarget() {
+        // Security edge case: the block only applies when the demo account is
+        // the *actor*, never when it's the target of another user's action.
+        GroupResponse group = createGroup(alice, "Host Group");
+        User demo = createDemoUser("demo@example.com", "Demo User");
+        groupService.joinGroup(demo.getEmail(), group.id());
+
+        groupService.kickMember(alice.getEmail(), group.id(), demo.getId());
+        assertThat(membershipRepository.existsByGroupIdAndUserId(group.id(), demo.getId())).isFalse();
+
+        groupService.joinGroup(demo.getEmail(), group.id());
+        groupService.banMember(alice.getEmail(), group.id(), demo.getId());
+        assertThat(banRepository.existsByGroupIdAndUserId(group.id(), demo.getId())).isTrue();
+        assertThat(membershipRepository.existsByGroupIdAndUserId(group.id(), demo.getId())).isFalse();
     }
 
     /**

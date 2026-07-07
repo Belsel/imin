@@ -242,4 +242,41 @@ class DirectChatServiceTest {
 
         assertThat(friendshipRepository.existsByFollowerIdAndFolloweeId(bob.getId(), alice.getId())).isTrue();
     }
+
+    // ---- try-demo-account restriction enforcement (specs/try-demo-account/spec.md) ----
+
+    @Test
+    void demoAccountCanStillSendAndReadDirectMessagesNormally() {
+        // Spot-check of DirectChatService's explicitly-allowed surface
+        // (sendMessage, getMessages, listThreads) for the demo account.
+        User demo = createUser("dm-demo@example.com", "Demo User");
+        demo.setDemoAccount(true);
+        userRepository.save(demo);
+
+        DirectMessageResponse sent = directChatService.sendMessage(
+                demo.getEmail(), alice.getId(), new PostDirectMessageRequest("hi from demo"));
+        assertThat(sent.body()).isEqualTo("hi from demo");
+
+        assertThat(directChatService.getMessages(demo.getEmail(), alice.getId(), null))
+                .extracting(DirectMessageResponse::body).contains("hi from demo");
+        assertThat(directChatService.listThreads(demo.getEmail()))
+                .extracting(DirectThreadResponse::otherUserId).contains(alice.getId());
+    }
+
+    @Test
+    void anotherUserBlockingTheDemoAccountStillPreventsItFromDmingThem() {
+        // Security edge case: blocking still works normally when the demo
+        // account is the target -- the demo-actor-only restriction never
+        // exempts the demo account from being blocked like any other user.
+        User demo = createUser("dm-demo-blocked@example.com", "Demo User");
+        demo.setDemoAccount(true);
+        userRepository.save(demo);
+
+        socialService.blockUser(alice.getEmail(), demo.getId());
+
+        assertThatThrownBy(() -> directChatService.sendMessage(
+                demo.getEmail(), alice.getId(), new PostDirectMessageRequest("can't reach alice")))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(403));
+    }
 }

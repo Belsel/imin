@@ -295,4 +295,49 @@ class ActivityServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(404));
     }
+
+    // ---- try-demo-account restriction enforcement (specs/try-demo-account/spec.md) ----
+
+    @Test
+    void demoAccountCannotUpdateOrDeleteAnActivityItOwns() {
+        User demo = createUser("demo@example.com", "Demo User");
+        demo.setDemoAccount(true);
+        userRepository.save(demo);
+
+        GroupResponse group = createGroup(alice, "Demo Activity Group");
+        groupService.joinGroup(demo.getEmail(), group.id());
+        ActivityResponse activity = activityService.createActivity(demo.getEmail(), group.id(),
+                new CreateActivityRequest("Demo's Activity", null, Instant.now().plus(1, ChronoUnit.DAYS), null, null));
+
+        assertThatThrownBy(() -> activityService.updateActivity(demo.getEmail(), group.id(), activity.id(),
+                new UpdateActivityRequest("Hijacked", null, Instant.now(), null, null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(403));
+
+        assertThatThrownBy(() -> activityService.deleteActivity(demo.getEmail(), group.id(), activity.id()))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode().value()).isEqualTo(403));
+
+        // Untouched -- the demo-owned activity survives both rejected attempts.
+        Activity persisted = activityRepository.findById(activity.id()).orElseThrow();
+        assertThat(persisted.getName()).isEqualTo("Demo's Activity");
+    }
+
+    @Test
+    void demoAccountCanStillCreateAndListActivitiesNormally() {
+        // Spot-check of the explicitly-allowed surface (createActivity, listActivities).
+        User demo = createUser("demo@example.com", "Demo User");
+        demo.setDemoAccount(true);
+        userRepository.save(demo);
+
+        GroupResponse group = createGroup(alice, "Demo Allowed Activity Group");
+        groupService.joinGroup(demo.getEmail(), group.id());
+
+        ActivityResponse created = activityService.createActivity(demo.getEmail(), group.id(),
+                new CreateActivityRequest("Demo Picnic", null, Instant.now().plus(1, ChronoUnit.DAYS), null, null));
+
+        assertThat(created.ownerId()).isEqualTo(demo.getId());
+        assertThat(activityService.listActivities(demo.getEmail(), group.id()))
+                .extracting(ActivityResponse::name).contains("Demo Picnic");
+    }
 }

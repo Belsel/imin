@@ -115,6 +115,7 @@ public class GroupChatService {
     @Transactional
     public void deleteMessage(String callerEmail, Long groupId, Long messageId) {
         User caller = findUserByEmail(callerEmail);
+        assertNotDemoAccount(caller);
         requireGroupExists(groupId);
         GroupChatMessage message = findMessageOr404(groupId, messageId);
         requireSenderOrAdmin(groupId, caller.getId(), message);
@@ -158,5 +159,12 @@ public class GroupChatService {
     private User findUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    }
+
+    private void assertNotDemoAccount(User user) {
+        if (user.isDemoAccount()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "This action is disabled for the shared demo account");
+        }
     }
 }

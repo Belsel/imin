@@ -33,6 +33,11 @@ public class AuthController {
         return ResponseEntity.ok(authService.login(request));
     }
 
+    @PostMapping("/demo-login")
+    public ResponseEntity<AuthResponse> demoLogin() {
+        return ResponseEntity.ok(authService.demoLogin());
+    }
+
     @GetMapping("/verify-email")
     public ResponseEntity<Void> verifyEmail(@RequestParam String token) {
         authService.verifyEmail(token);
