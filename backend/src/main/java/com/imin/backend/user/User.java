@@ -45,7 +45,7 @@ public class User {
     @Column(nullable = false)
     private boolean emailVerified = false;
 
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "boolean not null default false")
     private boolean demoAccount = false;
 
     private Instant lastSeenAt;
