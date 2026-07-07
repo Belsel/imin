@@ -6,6 +6,7 @@ import com.imin.backend.group.dto.GroupBanResponse;
 import com.imin.backend.group.dto.GroupMemberResponse;
 import com.imin.backend.group.dto.GroupRecommendationResponse;
 import com.imin.backend.group.dto.GroupResponse;
+import com.imin.backend.group.dto.PublicGroupRecommendationResponse;
 import com.imin.backend.group.dto.UpdateGroupRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -75,6 +76,11 @@ public class GroupController {
             @RequestParam(required = false) Integer limit) {
         int effectiveLimit = (limit == null || limit <= 0) ? DEFAULT_RECOMMENDATION_LIMIT : limit;
         return ResponseEntity.ok(groupService.recommendGroups(jwt.getSubject(), latitude, longitude, effectiveLimit));
+    }
+
+    @GetMapping("/public-recommendations")
+    public ResponseEntity<List<PublicGroupRecommendationResponse>> getPublicRecommendations() {
+        return ResponseEntity.ok(groupService.getPublicRecommendations());
     }
 
     @PostMapping("/{id}/categories")

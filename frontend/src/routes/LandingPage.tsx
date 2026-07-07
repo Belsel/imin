@@ -1,9 +1,13 @@
 import { Link } from 'react-router'
+import PublicGroupsSection from '../components/PublicGroupsSection'
 
 /**
  * Public, unauthenticated landing page rendered at "/" for logged-out
- * visitors (see the auth-state branch in App.tsx). Purely static marketing
- * content — no data fetching, no backend calls.
+ * visitors (see the auth-state branch in App.tsx). Mostly static marketing
+ * content: the only data fetching this page performs is one unauthenticated
+ * `GET /api/groups/public-recommendations` call, made by the child
+ * `<PublicGroupsSection />` component, to show a few real groups as a trust
+ * signal — no other backend calls happen anywhere on this page.
  *
  * Single job: convince a cold visitor (arriving from a shared link, a
  * search result, or just the bare domain, on mobile or desktop) in a few
@@ -41,6 +45,8 @@ export default function LandingPage() {
           </div>
         </div>
       </header>
+
+      <PublicGroupsSection />
 
       <main className="mx-auto max-w-2xl px-6 py-16">
         <h2 className="mb-10 text-center text-2xl font-bold font-display text-text">How ImIn works</h2>

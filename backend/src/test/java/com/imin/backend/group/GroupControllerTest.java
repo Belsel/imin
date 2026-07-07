@@ -359,6 +359,36 @@ class GroupControllerTest {
     }
 
     @Test
+    void publicRecommendationsEndpointRequiresNoAuthorizationHeader() throws Exception {
+        mockMvc.perform(get("/api/groups/public-recommendations"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void publicRecommendationsResponseShapeExcludesAuthenticatedOnlyFields() throws Exception {
+        createGroupViaApi(aliceJwt, "Public Rec Group");
+
+        mockMvc.perform(get("/api/groups/public-recommendations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").exists())
+                .andExpect(jsonPath("$[0].name").exists())
+                .andExpect(jsonPath("$[0].memberCount").exists())
+                .andExpect(jsonPath("$[0].categories").exists())
+                .andExpect(jsonPath("$[0].distanceKm").doesNotExist())
+                .andExpect(jsonPath("$[0].matchingCategoryCount").doesNotExist())
+                .andExpect(jsonPath("$[0].createdAt").doesNotExist());
+    }
+
+    @Test
+    void publicRecommendationsReturnsEmptyArrayWhenNoGroupsExist() throws Exception {
+        groupRepository.deleteAll();
+
+        mockMvc.perform(get("/api/groups/public-recommendations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
     void nonAdminCannotDeleteGroupOverHttp() throws Exception {
         Long groupId = createGroupViaApi(aliceJwt, "Undeletable By Bob Group");
         mockMvc.perform(post("/api/groups/" + groupId + "/members")

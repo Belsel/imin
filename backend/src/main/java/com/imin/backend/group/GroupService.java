@@ -12,6 +12,7 @@ import com.imin.backend.group.dto.GroupBanResponse;
 import com.imin.backend.group.dto.GroupMemberResponse;
 import com.imin.backend.group.dto.GroupRecommendationResponse;
 import com.imin.backend.group.dto.GroupResponse;
+import com.imin.backend.group.dto.PublicGroupRecommendationResponse;
 import com.imin.backend.group.dto.UpdateGroupRequest;
 import com.imin.backend.user.User;
 import com.imin.backend.user.UserRepository;
@@ -46,6 +47,8 @@ public class GroupService {
 
     /** Half of Earth's circumference (km) — the maximum possible distance between any two points on Earth. */
     private static final double EARTH_MAX_DISTANCE_KM = 20038.0;
+
+    private static final int PUBLIC_RECOMMENDATION_LIMIT = 6;
 
     private final GroupRepository groupRepository;
     private final GroupMembershipRepository membershipRepository;
@@ -353,6 +356,48 @@ public class GroupService {
                         categoryResponsesByGroup.get(s.group().getId()),
                         s.distanceKm(),
                         s.matchCount()))
+                .toList();
+    }
+
+    /**
+     * Top-6-by-member-count public recommendation feed for the unauthenticated
+     * landing page (see specs/public-group-recommendations/spec.md). No
+     * caller identity, location, or preferences are involved — every group in
+     * the system is eligible, ranked by member count descending, tie-broken
+     * by createdAt descending (newer wins), then id ascending, and truncated
+     * to the top {@value #PUBLIC_RECOMMENDATION_LIMIT}.
+     */
+    public List<PublicGroupRecommendationResponse> getPublicRecommendations() {
+        Map<Long, Long> memberCountByGroupId = membershipRepository.findAll().stream()
+                .collect(Collectors.groupingBy(GroupMembership::getGroupId, Collectors.counting()));
+
+        List<Group> topGroups = groupRepository.findAll().stream()
+                .sorted(Comparator
+                        .comparingLong((Group g) -> memberCountByGroupId.getOrDefault(g.getId(), 0L))
+                        .reversed()
+                        .thenComparing(Group::getCreatedAt, Comparator.reverseOrder())
+                        .thenComparing(Group::getId))
+                .limit(PUBLIC_RECOMMENDATION_LIMIT)
+                .toList();
+
+        List<GroupCategoryLink> links = categoryLinkRepository.findByGroupIdIn(
+                topGroups.stream().map(Group::getId).toList());
+        Map<Long, List<Long>> categoryIdsByGroup = links.stream()
+                .collect(Collectors.groupingBy(GroupCategoryLink::getGroupId,
+                        Collectors.mapping(GroupCategoryLink::getCategoryId, Collectors.toList())));
+
+        Map<Long, List<CategoryResponse>> categoryResponsesByGroup = new HashMap<>();
+        for (Group g : topGroups) {
+            List<Long> ids = categoryIdsByGroup.getOrDefault(g.getId(), List.of());
+            categoryResponsesByGroup.put(g.getId(),
+                    groupCategoryRepository.findAllById(ids).stream().map(CategoryResponse::from).toList());
+        }
+
+        return topGroups.stream()
+                .map(g -> PublicGroupRecommendationResponse.from(
+                        g,
+                        memberCountByGroupId.getOrDefault(g.getId(), 0L),
+                        categoryResponsesByGroup.get(g.getId())))
                 .toList();
     }
 

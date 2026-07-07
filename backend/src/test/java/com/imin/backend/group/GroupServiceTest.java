@@ -7,6 +7,7 @@ import com.imin.backend.category.UserCategoryPreferenceRepository;
 import com.imin.backend.group.dto.CreateGroupRequest;
 import com.imin.backend.group.dto.GroupRecommendationResponse;
 import com.imin.backend.group.dto.GroupResponse;
+import com.imin.backend.group.dto.PublicGroupRecommendationResponse;
 import com.imin.backend.group.dto.UpdateGroupRequest;
 import com.imin.backend.user.AuthProvider;
 import com.imin.backend.user.User;
@@ -504,6 +505,145 @@ class GroupServiceTest {
         List<GroupResponse> results = groupService.searchGroups(bob.getEmail(), "Joined");
 
         assertThat(results).isEmpty();
+    }
+
+    @Test
+    void publicRecommendationsOrderByMemberCountDescending() {
+        Group low = rawGroup("Low Count", Instant.now());
+        Group mid = rawGroup("Mid Count", Instant.now());
+        Group high = rawGroup("High Count", Instant.now());
+        addMembers(low, 1);
+        addMembers(mid, 3);
+        addMembers(high, 5);
+
+        List<PublicGroupRecommendationResponse> recs = groupService.getPublicRecommendations();
+
+        assertThat(recs).extracting(PublicGroupRecommendationResponse::id)
+                .containsExactly(high.getId(), mid.getId(), low.getId());
+    }
+
+    @Test
+    void publicRecommendationsTieBreakByCreatedAtDescendingThenId() {
+        Instant now = Instant.now();
+        Group older = rawGroup("Older Same Count", now.minus(1, ChronoUnit.DAYS));
+        Group newer = rawGroup("Newer Same Count", now);
+        addMembers(older, 2);
+        addMembers(newer, 2);
+
+        // Equal member count and equal createdAt -> lower id first.
+        Instant sameInstant = now.plus(1, ChronoUnit.DAYS);
+        Group sameA = rawGroup("Same Instant A", sameInstant);
+        Group sameB = rawGroup("Same Instant B", sameInstant);
+        addMembers(sameA, 1);
+        addMembers(sameB, 1);
+
+        List<PublicGroupRecommendationResponse> recs = groupService.getPublicRecommendations();
+        List<Long> ids = recs.stream().map(PublicGroupRecommendationResponse::id).toList();
+
+        // Newer createdAt wins the member-count-2 tie.
+        assertThat(ids.indexOf(newer.getId())).isLessThan(ids.indexOf(older.getId()));
+        // Equal member count and createdAt -> lower id first.
+        assertThat(ids.indexOf(sameA.getId())).isLessThan(ids.indexOf(sameB.getId()));
+    }
+
+    @Test
+    void publicRecommendationsReturnTopSixOfEightGroups() {
+        List<Group> groups = new java.util.ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            Group g = rawGroup("Group " + i, Instant.now());
+            addMembers(g, i); // distinct member counts 0..7
+            groups.add(g);
+        }
+
+        List<PublicGroupRecommendationResponse> recs = groupService.getPublicRecommendations();
+
+        assertThat(recs).hasSize(6);
+        // Top 6 by member count descending: groups with counts 7,6,5,4,3,2 (indices 7..2).
+        List<Long> expectedIds = List.of(
+                groups.get(7).getId(), groups.get(6).getId(), groups.get(5).getId(),
+                groups.get(4).getId(), groups.get(3).getId(), groups.get(2).getId());
+        assertThat(recs.stream().map(PublicGroupRecommendationResponse::id).toList()).isEqualTo(expectedIds);
+    }
+
+    @Test
+    void publicRecommendationsReturnAllWhenFewerThanSixGroupsExist() {
+        Group a = rawGroup("Only A", Instant.now());
+        Group b = rawGroup("Only B", Instant.now());
+
+        List<PublicGroupRecommendationResponse> recs = groupService.getPublicRecommendations();
+
+        assertThat(recs).hasSize(2);
+        assertThat(recs.stream().map(PublicGroupRecommendationResponse::id).toList())
+                .containsExactlyInAnyOrder(a.getId(), b.getId());
+    }
+
+    @Test
+    void publicRecommendationsReturnEmptyListWhenNoGroupsExist() {
+        List<PublicGroupRecommendationResponse> recs = groupService.getPublicRecommendations();
+
+        assertThat(recs).isEmpty();
+    }
+
+    @Test
+    void publicRecommendationsRoundCoordinatesButDoNotMutateStoredGroup() {
+        Group group = new Group();
+        group.setName("Precise Location Group");
+        group.setDescription("d");
+        group.setLatitude(51.5074123);
+        group.setLongitude(-0.1277654);
+        group.setCreatedAt(Instant.now());
+        groupRepository.save(group);
+
+        List<PublicGroupRecommendationResponse> recs = groupService.getPublicRecommendations();
+
+        assertThat(recs).hasSize(1);
+        assertThat(recs.get(0).latitude()).isEqualTo(51.51);
+        assertThat(recs.get(0).longitude()).isEqualTo(-0.13);
+
+        Group stored = groupRepository.findById(group.getId()).orElseThrow();
+        assertThat(stored.getLatitude()).isEqualTo(51.5074123);
+        assertThat(stored.getLongitude()).isEqualTo(-0.1277654);
+    }
+
+    @Test
+    void publicRecommendationsIncludeGroupWithZeroMembers() {
+        Group group = rawGroup("Memberless Group", Instant.now());
+
+        List<PublicGroupRecommendationResponse> recs = groupService.getPublicRecommendations();
+
+        assertThat(recs).hasSize(1);
+        assertThat(recs.get(0).id()).isEqualTo(group.getId());
+        assertThat(recs.get(0).memberCount()).isEqualTo(0);
+    }
+
+    /**
+     * Constructs and saves a {@code Group} directly via {@code GroupRepository},
+     * bypassing {@code groupService.createGroup} (which would force a
+     * creator-admin membership and today's {@code Instant.now()} createdAt),
+     * so ranking tests can set exact, distinct createdAt values. Relies on
+     * {@code updatable = false} only suppressing UPDATE statements, not the
+     * initial INSERT.
+     */
+    private Group rawGroup(String name, Instant createdAt) {
+        Group group = new Group();
+        group.setName(name);
+        group.setDescription("desc");
+        group.setLatitude(0.0);
+        group.setLongitude(0.0);
+        group.setCreatedAt(createdAt);
+        return groupRepository.save(group);
+    }
+
+    /** Adds {@code count} distinct-user memberships directly via the repository, for exact member counts. */
+    private void addMembers(Group group, int count) {
+        for (int i = 0; i < count; i++) {
+            User user = createUser(group.getId() + "-member-" + i + "@example.com", "Member " + i);
+            GroupMembership membership = new GroupMembership();
+            membership.setGroupId(group.getId());
+            membership.setUserId(user.getId());
+            membership.setAdmin(false);
+            membershipRepository.save(membership);
+        }
     }
 
     private GroupResponse createGroup(User creator, String name) {

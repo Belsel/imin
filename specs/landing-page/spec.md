@@ -84,7 +84,12 @@ recognizably part of ImIn's existing design system.
 
 ## Out of scope
 
-- Any new backend endpoints or API calls.
+- Any new backend endpoints or API calls, **except** the one
+  unauthenticated `GET /api/groups/public-recommendations` fetch added by
+  `specs/public-group-recommendations/spec.md` for a recommended-groups
+  section on this same page — see that spec for details. Aside from that
+  one call, this page still performs no other data fetching or backend
+  calls.
 - Image or illustration assets (the MVP has none; see
   `specs/ui-redesign/spec.md`'s out-of-scope note).
 - Analytics or tracking of any kind.

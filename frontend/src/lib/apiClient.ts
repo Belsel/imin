@@ -259,6 +259,16 @@ export interface GroupRecommendationResponse {
   matchingCategoryCount: number
 }
 
+export interface PublicGroupRecommendationResponse {
+  id: number
+  name: string
+  description: string | null
+  latitude: number
+  longitude: number
+  memberCount: number
+  categories: CategoryResponse[]
+}
+
 export interface GroupMemberResponse {
   userId: number
   displayName: string
@@ -310,6 +320,23 @@ export function recommendGroups(
   if (limit) params.set('limit', String(limit))
   return apiFetch<GroupRecommendationResponse[]>(`/api/groups/recommendations?${params.toString()}`, {
     method: 'GET',
+  })
+}
+
+/**
+ * Unauthenticated recommended-groups feed for the public landing page (see
+ * specs/public-group-recommendations/spec.md). Deliberately passes
+ * skipAuth so no Authorization header is ever sent, even if a stale token
+ * happens to be in localStorage from a prior session on this device --
+ * the backend ignores any Authorization header on this path regardless
+ * (Requirement 3), but skipping it client-side too keeps this call
+ * trivially cache/CDN-safe and avoids sending a token the endpoint will
+ * never look at.
+ */
+export function getPublicRecommendations(): Promise<PublicGroupRecommendationResponse[]> {
+  return apiFetch<PublicGroupRecommendationResponse[]>('/api/groups/public-recommendations', {
+    method: 'GET',
+    skipAuth: true,
   })
 }
 
