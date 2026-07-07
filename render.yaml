@@ -1,8 +1,14 @@
 services:
+  # Production. Deploys from `master`. If this service was originally created
+  # in the Render dashboard as a standalone Web Service (rather than via
+  # "New Blueprint" / Blueprint sync), the `branch` key below is documentation
+  # only — the dashboard's Settings > Build & Deploy > Branch value is what
+  # actually controls it and must be checked/set there directly.
   - type: web
     name: imin-backend
     region: frankfurt
     runtime: docker
+    branch: master
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     plan: free
@@ -20,4 +26,48 @@ services:
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: FRONTEND_URL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM_ADDRESS
+        sync: false
+      - key: ORS_API_KEY
+        sync: false
+
+  # Optional staging service for previewing `develop` before it merges to
+  # `master`. This block only takes effect if the Render account re-syncs
+  # this Blueprint, or if the user manually creates a service in the Render
+  # dashboard using this as reference. It needs its own Neon database wired
+  # to DATABASE_URL/DATABASE_USERNAME/DATABASE_PASSWORD — ideally a Neon
+  # "branch" of the production database (Neon's built-in DB branching
+  # feature), not the same database as production. JWT_SECRET is generated
+  # independently here on purpose — do not reuse production's secret.
+  - type: web
+    name: imin-backend-develop
+    region: frankfurt
+    runtime: docker
+    branch: develop
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USERNAME
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM_ADDRESS
+        sync: false
+      - key: ORS_API_KEY
         sync: false
