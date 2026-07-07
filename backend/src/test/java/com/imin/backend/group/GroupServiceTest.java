@@ -496,6 +496,16 @@ class GroupServiceTest {
         assertThat(results).isEmpty();
     }
 
+    @Test
+    void searchExcludesGroupsCallerHasAlreadyJoined() {
+        GroupResponse group = createGroup(alice, "Joined Club");
+        groupService.joinGroup(bob.getEmail(), group.id());
+
+        List<GroupResponse> results = groupService.searchGroups(bob.getEmail(), "Joined");
+
+        assertThat(results).isEmpty();
+    }
+
     private GroupResponse createGroup(User creator, String name) {
         return groupService.createGroup(creator.getEmail(), new CreateGroupRequest(name, "desc", 0.0, 0.0, List.of()));
     }

@@ -111,9 +111,13 @@ public class GroupService {
                 : groupRepository.findByNameContainingIgnoreCase(query);
 
         Set<Long> excluded = bannedGroupIdsForUser(caller.getId());
+        Set<Long> memberGroupIds = membershipRepository.findByUserId(caller.getId()).stream()
+                .map(GroupMembership::getGroupId)
+                .collect(Collectors.toSet());
 
         return groups.stream()
                 .filter(g -> !excluded.contains(g.getId()))
+                .filter(g -> !memberGroupIds.contains(g.getId()))
                 .map(g -> toGroupResponse(g, caller.getId()))
                 .toList();
     }

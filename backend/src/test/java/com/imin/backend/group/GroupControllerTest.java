@@ -158,9 +158,11 @@ class GroupControllerTest {
     void searchGroupsFindsCreatedGroupByName() throws Exception {
         createGroupViaApi(aliceJwt, "Mountain Bikers HTTP");
 
+        // Search as bob (not a member) since a searcher's own joined groups are
+        // now excluded from their own search results.
         mockMvc.perform(get("/api/groups/search")
                         .param("q", "Mountain")
-                        .header("Authorization", "Bearer " + aliceJwt))
+                        .header("Authorization", "Bearer " + bobJwt))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].name").value("Mountain Bikers HTTP"));
     }
