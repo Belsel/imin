@@ -1,28 +1,28 @@
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600&display=swap");
 @import "tailwindcss";
 
 @theme {
   /* Core palette */
-  --color-background:    #F0FDFA;
-  --color-surface:       #FFFFFF;
-  --color-primary:       #0B6E65;
-  --color-on-primary:    #FFFFFF;
-  --color-accent:        #D97706;
-  --color-text:          #0F172A;
+  --color-background: #f0fdfa;
+  --color-surface: #ffffff;
+  --color-primary: #eba946;
+  --color-on-primary: #ffffff;
+  --color-accent: #d97706;
+  --color-text: #0f172a;
 
   /* Extended colour tokens */
-  --color-text-muted:    #475569;
-  --color-border:        #CBD5E1;
+  --color-text-muted: #475569;
+  --color-border: #cbd5e1;
 
   /* Semantic aliases */
-  --color-error:         #DC2626;
-  --color-warning:       #FFFBEB;
-  --color-warning-text:  #92400E;
-  --color-success:       #15803D;
+  --color-error: #dc2626;
+  --color-warning: #fffbeb;
+  --color-warning-text: #92400e;
+  --color-success: #15803d;
 
   /* Font families */
-  --font-display: 'Syne', sans-serif;
-  --font-body:    'DM Sans', sans-serif;
+  --font-display: "Syne", sans-serif;
+  --font-body: "DM Sans", sans-serif;
 }
 
 /* Global base styles */
